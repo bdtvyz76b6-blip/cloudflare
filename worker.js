@@ -3,33 +3,32 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname; 
     
-    // Ожидаем путь вида: /sub/supra/123456789.json
     const parts = path.split('/');
-    if (parts.length < 4) return new Response("Bad Request: Invalid path", { status: 400 });
+    if (parts.length < 4) return new Response("Bad Request", { status: 400 });
 
     const tariff = parts[2];
     const uid = parts[3].replace('.json', '');
     
-    // ВНИМАНИЕ: Здесь должна быть ТАЖЕ соль, что и в .env бота (SUB_SALT)
-    const salt = "2ix847xy"; 
+    // Берем соль из переменных окружения Cloudflare
+    const salt = env.SUB_SALT || "d3hsR6"; 
+    const token = env.GITHUB_TOKEN;
+
+    // Используем API GitHub вместо raw
+    const ghApiUrl = `https://api.github.com/repos/bdtvyz76b6-blip/ixxybotnow/contents/servers/sub_${tariff}_${salt}_${uid}.json`;
     
-    // Формируем URL к GitHub
-    const ghUrl = `https://raw.githubusercontent.com/bdtvyz76b6-blip/ixxybotnow/main/servers/sub_${tariff}_${salt}_${uid}.json`;
-    
-    // Скачиваем файл
-    const response = await fetch(ghUrl);
+    const response = await fetch(ghApiUrl, {
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Accept": "application/vnd.github.v3.raw",
+            "User-Agent": "ixxy-worker"
+        }
+    });
     
     if (!response.ok) {
-      // Если файл не найден, выводим точный URL, который мы искали
-      return new Response(`404 Not Found.\nWe tried to fetch: ${ghUrl}`, { 
-          status: 404,
-          headers: { "Content-Type": "text/plain; charset=utf-8" }
-      });
+      return new Response(`404 Not Found.\nAPI URL: ${ghApiUrl}`, { status: 404 });
     }
     
     const jsonBody = await response.text();
-
-    // Считаем Expire (30 дней от текущего момента)
     const expireTs = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
     const headers = {
