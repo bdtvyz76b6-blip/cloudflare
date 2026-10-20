@@ -1,28 +1,37 @@
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const path = url.pathname; // Например: /sub/supra/123456789.json
+    const path = url.pathname; 
     
-    // 1. Забираем чистый JSON из твоего GitHub
-    // Путь формируется как: servers/sub_ТАРИФ_SALT_UID.json
-    const parts = path.split('/'); // ['', 'sub', 'supra', '123456789.json']
-    if (parts.length < 4) return new Response("Bad Request", { status: 400 });
+    // Ожидаем путь вида: /sub/supra/123456789.json
+    const parts = path.split('/');
+    if (parts.length < 4) return new Response("Bad Request: Invalid path", { status: 400 });
 
     const tariff = parts[2];
     const uid = parts[3].replace('.json', '');
-    const salt = "2ix847xy"; // Твой SUB_SALT из .env
     
+    // ВНИМАНИЕ: Здесь должна быть ТАЖЕ соль, что и в .env бота (SUB_SALT)
+    const salt = "2ix847xy"; 
+    
+    // Формируем URL к GitHub
     const ghUrl = `https://raw.githubusercontent.com/bdtvyz76b6-blip/ixxybotnow/main/servers/sub_${tariff}_${salt}_${uid}.json`;
     
-    // 2. Скачиваем файл
+    // Скачиваем файл
     const response = await fetch(ghUrl);
-    if (!response.ok) return new Response("Not Found", { status: 404 });
+    
+    if (!response.ok) {
+      // Если файл не найден, выводим точный URL, который мы искали
+      return new Response(`404 Not Found.\nWe tried to fetch: ${ghUrl}`, { 
+          status: 404,
+          headers: { "Content-Type": "text/plain; charset=utf-8" }
+      });
+    }
+    
     const jsonBody = await response.text();
 
-    // 3. Считаем Expire (пока ставим 30 дней от текущего момента, так как воркер не знает реальную дату)
+    // Считаем Expire (30 дней от текущего момента)
     const expireTs = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
-    // 4. Формируем заголовки Happ UI
     const headers = {
       "content-type": "application/json; charset=utf-8",
       "profile-title": "☂️ IXXY VPN",
